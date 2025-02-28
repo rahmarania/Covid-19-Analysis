@@ -1,0 +1,134 @@
+---
+title: "Covid19"
+author: "Rahma Fairuz Rania"
+date: "2025-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is project for self learning purpose, reference from 
+[Tech Tribe](https://www.youtube.com/watch?v=D_CNmYkGRUc). You can download datasets from [here](https://www.kaggle.com/datasets/sudalairajkumar/novel-corona-virus-2019-dataset/versions/25?resource=download) 
+
+## Libraries
+
+```{r, message=FALSE, warning=FALSE}
+library(Hmisc) # for data analysis inc missing value handle, character manipulation
+library(dplyr) # data manipulation
+library(tidyverse) # data science lib
+library(ggplot2) # data visualization
+library(glue) # tooltip
+library(plotly) # interactive visualization
+library(rworldmap) # world map
+```
+
+
+
+## Import Data
+
+```{r}
+rm(list=ls()) # remove all variable stored previously
+dt <- read.csv("C:/Users/Asus/Downloads/COVID19_line_list_data.csv")
+head(dt)
+```
+
+## data wrangling and visualization
+
+```{r}
+dim(dt)
+```
+
+```{r}
+colnames(dt)
+```
+```{r}
+# remove unused column
+dt <- dt %>% select(-c( "case_in_country","X","X.1","X.2","X.3","X.4","X.5","X.6","source"))
+```
+
+
+```{r}
+colSums(is.na(dt))
+```
+
+```{r}
+sum(duplicated(dt))
+```
+Our data has no duplicate data but has missing value. You can also see the data information by describe().
+
+
+## Data Wrangling and Visualization
+
+```{r}
+# death rate
+dt$death_count <- as.integer(dt$death != 0) # only take 1 value (died), if its true set it to 1
+sum(dt$death_count)/nrow(dt)
+```
+Death rate is about 0.05%
+
+
+```{r}
+# which age most died
+char1 <- dt %>%
+  filter(death == 1) %>%
+  group_by(age) %>%
+  summarise(total = n()) %>%  
+  arrange(desc(total)) %>% 
+  ungroup() %>% 
+  head(5) %>% 
+  mutate(label = paste("Age:", age, "\nTotal:", total, "People")) %>%  
+
+  ggplot(aes(x = reorder(as.factor(age), -total), y = total, 
+             fill = as.factor(age), text = label)) +  
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Most Common Ages of Death Due to COVID-19",
+       x = "Age (Years Old)",
+       y = "Total Deaths") +
+  theme_classic() +
+  theme(legend.position = "none")
+
+ggplotly(char1, tooltip = "text") 
+```
+
+Older people can easily infected by corona and most of them were died.
+
+```{r}
+# which gender most died
+male = subset(dt, gender   == "male")
+female = subset(dt, gender == "female")
+mean(male$death_count) 
+mean(female$death_count)
+```
+```{r}
+by_gender <- rbind(male, female)
+
+char2 <- by_gender %>% group_by(gender) %>% summarise(total = n()) %>% ungroup() %>% mutate(label =paste("Gender:", gender, "\nTotal:", total, "People")) %>% ggplot(aes(x = as.factor(gender), y = total, 
+             fill = as.factor(gender), text = label)) +  
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Death by Gender",
+       x = "Gender",
+       y = "Total Deaths") 
+
+ggplotly(char2, tooltip = "text")
+```
+Men are more likely died when they affected by corona virus.
+
+
+```{r,  warning=FALSE}
+# total cases per country
+case_country <- dt %>% group_by(country) %>% summarise(total = n()) %>% arrange(desc(total))
+case_country
+
+# Join data with map
+map_data <- joinCountryData2Map(case_country, joinCode = "NAME", nameJoinColumn = "country")
+
+# Plot the map
+mapCountryData(map_data, nameColumnToPlot = "total", 
+               mapTitle = "COVID-19 Cases by Country", 
+               colourPalette = "heat", catMethod = "fixedWidth")
+
+```
+
+The most infected in the early 2020 is in East Asian such China, Japan, and Soouth Korea.
